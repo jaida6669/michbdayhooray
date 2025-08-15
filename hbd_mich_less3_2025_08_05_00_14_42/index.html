@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Happy Birthday Mich!</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #f0f8ff; font-family: "Comic Sans MS", cursive, sans-serif; }
+    button {
+      font-size: 20px; padding: 10px 20px; border: none; border-radius: 10px; cursor: pointer;
+      font-family: "Comic Sans MS", cursive, sans-serif; display: block; margin: 10px auto;
+      transition: opacity 1s;
+    }
+    #startMusicBtn { background-color: black; color: white; }
+    #startMusicBtn:hover { background-color: #333333; }
+    #switchCanvasBtn { background-color: hotpink; color: black; opacity: 0; visibility: hidden; }
+    #switchCanvasBtn.show { opacity: 1; visibility: visible; }
+    #nextBtn { background-color: black; color: white; opacity: 0; visibility: hidden; }
+    #nextBtn.show { opacity: 1; visibility: visible; }
+    #topRightBtn { position: absolute; top: 20px; right: 20px; display: none; }
+    #btnContainer { position: absolute; top: 50%; left: 50%; transform: translateX(-50%); z-index: 10; text-align: center; }
+    #nextBtnContainer { position: absolute; bottom: 20px; right: 20px; display: block; }
+    #playFourthCanvasBtn {
+      position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+      font-size: 24px; padding: 15px 30px; border-radius: 30px; border: none;
+      color: white; background: linear-gradient(90deg, red, orange, yellow, green, cyan, blue, violet);
+      opacity: 1; transition: opacity 1s; display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="btnContainer">
+    <button id="startMusicBtn">Beep</button>
+    <button id="switchCanvasBtn">Click Me</button>
+  </div>
+  <div id="nextBtnContainer">
+    <button id="nextBtn">Next</button>
+  </div>
+  <button id="topRightBtn">Click Here</button>
+  <button id="playFourthCanvasBtn">▶ Play Music</button>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js"></script>
+
+  <script>
+    let confettiArray = [], heartsArray = [], stars = [];
+    let isSecondCanvas = false, isThirdCanvas = false, isFourthCanvas = false;
+    let secondCanvasAlpha = 0, thirdTextAlpha = 0, secondLineAlpha = 0, thirdTextStartTime = 0;
+    let topRightBtn, topRightColorChangeInterval;
+    let img, img1, img2, img3, img4, imgHeart;
+    let song, secondCanvasSong, fourthCanvasSong, fft, isPlayingFourth = false;
+    let sideHearts = [], lyrics = [];
+    let lyricY = 0, lyricPaused = false;
+    let lyricStartDelay = 22000;
+    let lyricStartTime = null;
+    let lyricDelayUsed = false;
+    let lyricFadeAlpha = 0;
+    let lyricEverShown = false;
+
+    function preload(){
+      img = loadImage('michjaida.jpg');
+      img1 = loadImage('michcrown.jpg');
+      img2 = loadImage('michyankee.JPG');
+      img3 = loadImage('us.JPG');
+      img4 = loadImage('michdown.JPG');
+      imgHeart = loadImage('michcamera.JPG');
+
+      song = loadSound('GO!.m4a'); 
+      secondCanvasSong = loadSound('ChopinClip.mp3'); 
+      fourthCanvasSong = loadSound('MichSong2.mp3');
+
+      lyrics = `[Verse 1]
+
+We missed sunrise
+Can’t afford to be shy
+been hit 
+With the greatest surprise
+
+Eye on the prize
+That’s your soft sigh
+Haven’t got a clue
+You’re lost looking at the sky
+
+[chorus]
+
+So
+
+Do you wanna
+Do you wanna 
+Do you wanna come closer
+
+Do you wanna
+Do you wanna 
+Do you wanna think it over
+
+Ball of light my overexposure
+
+[Verse 2]
+
+Smooth as a ferry boat
+It’s hard to sing on note
+Officially officially 
+I don’t try not to gloat
+
+Of all the anecdotes
+The ones that we wrote
+I feel your wave the most
+Endddd quote
+
+[chorus 2]
+
+Do you wanna 
+Do you wanna 
+Do you wanna kill composure
+
+Do you wanna 
+Do you wanna 
+Do you wanna plot a takeover
+
+Hit me like a bulldozer 
+
+[verse 3]
+
+Special in more ways than one
+I know we’ve only just begun
+
+Walks to pork buns
+It’s this I can’t outrun
+Ears red and face bright too
+It’s almost like I like you a ton
+
+[chorus reprise / outro]
+
+Do you wanna
+Do you wanna 
+
+Do you wanna even sober
+
+Do you wanna
+Do you wanna
+
+I’m like a tea without sugar
+
+I wanna
+I wanna
+I wanna`.split('\n');
+    }
+
+    function setup(){
+      createCanvas(windowWidth,windowHeight);
+      angleMode(DEGREES);
+      fft = new p5.FFT();
+
+      for(let i=0;i<300;i++) confettiArray.push(new Confetti());
+      for(let i=0;i<150;i++) heartsArray.push(new Heart());
+
+      const startBtn = document.getElementById('startMusicBtn');
+      const switchBtn = document.getElementById('switchCanvasBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      topRightBtn = document.getElementById('topRightBtn');
+      const playFourthBtn = document.getElementById('playFourthCanvasBtn');
+
+      startBtn.addEventListener('click', ()=>{
+        if(getAudioContext().state!=='running') getAudioContext().resume();
+        if(!song.isPlaying()) song.loop();
+        setTimeout(()=>{switchBtn.classList.add('show');},5000);
+      });
+
+      switchBtn.addEventListener('click', ()=>{
+        isSecondCanvas = true;
+        document.getElementById('btnContainer').style.display='none';
+        if(song.isPlaying()) song.stop();
+        if(getAudioContext().state!=='running') getAudioContext().resume();
+        if(!secondCanvasSong.isPlaying()) secondCanvasSong.loop();
+        secondCanvasAlpha=0;
+        setTimeout(()=>{nextBtn.classList.add('show');},6000);
+      });
+
+      nextBtn.addEventListener('click', ()=>{
+        isThirdCanvas = true;
+        nextBtn.classList.remove('show');
+        if(secondCanvasSong.isPlaying()) secondCanvasSong.stop();
+        setTimeout(()=>{
+          topRightBtn.style.display='block';
+          topRightColorChangeInterval = setInterval(()=>{
+            topRightBtn.style.backgroundColor = `rgb(${random(0,255)},${random(0,255)},${random(0,255)})`;
+          },1000);
+        },4000);
+      });
+
+      topRightBtn.addEventListener('click', ()=>{
+        isFourthCanvas = true; isThirdCanvas=false;
+        topRightBtn.style.display='none';
+        clearInterval(topRightColorChangeInterval);
+        playFourthBtn.style.display='block';
+      });
+
+      playFourthBtn.addEventListener('click', ()=>{
+        if(getAudioContext().state!=='running') getAudioContext().resume();
+        if(!isPlayingFourth){
+          fourthCanvasSong.loop();
+          lyricPaused = false;
+
+          if(!lyricDelayUsed){
+            lyricStartTime = millis();
+            lyricFadeAlpha = 0;
+          } else {
+            lyricStartTime = null;
+          }
+
+          if(!lyricEverShown){
+            lyricY = height;
+            lyricEverShown = true;
+          }
+
+          isPlayingFourth = true;
+          playFourthBtn.innerText='⏸ Pause Music';
+        } else {
+          fourthCanvasSong.pause();
+          lyricPaused=true;
+          isPlayingFourth=false;
+          playFourthBtn.innerText='▶ Play Music';
+        }
+      });
+
+      const textY = height*0.45;
+      sideHearts.push(new SideHeart(width*0.1,textY));
+      sideHearts.push(new SideHeart(width*0.9,textY));
+
+      for(let i=0;i<200;i++){
+        stars.push({x: random(width), y: random(height), baseSize: random(1,3), size: random(1,3),
+                    twinkleSpeed: random(0.01,0.05), twinkleDir: 1});
+      }
+
+      // Heart mask for fourth canvas
+      heartMask = createGraphics(300, 300);
+      heartMask.clear();
+      heartMask.fill(255);
+      heartMask.noStroke();
+      heartMask.beginShape();
+      heartMask.vertex(150, 30);
+      heartMask.bezierVertex(240, -50, 300, 120, 150, 280);
+      heartMask.bezierVertex(0, 120, 60, -50, 150, 30);
+      heartMask.endShape(CLOSE);
+
+      maskedHeart = imgHeart.get();
+      maskedHeart.mask(heartMask);
+    }
+
+    function draw(){
+      if(isFourthCanvas) drawFourthCanvas();
+      else if(isThirdCanvas) drawThirdCanvas();
+      else if(isSecondCanvas) drawSecondCanvas();
+      else drawFirstCanvas();
+    }
+
+    // --- First Canvas ---
+let colorIndex = 0;
+const rainbowColors = ['red','orange','yellow','green','blue','indigo','violet'];
+let lastColorChange = 0;
+
+function drawFirstCanvas(){
+  background('#f0f8ff');
+
+  // Confetti
+  for(let c of confettiArray) c.display();
+
+  const centerX = width/2, heartY = height*0.25, textY = height*0.45;
+  const spacing=300, topSize=140, bottomSize=160, topY=heartY+20, bottomY=textY+250;
+
+  // Central heart (static red)
+  push(); 
+  translate(centerX, heartY); 
+  let heartScale = 1.6 + 0.08 * sin(frameCount * 0.1); 
+  scale(heartScale, heartScale);
+  fill('red'); noStroke();
+  beginShape();
+  vertex(0, -20); bezierVertex(20, -50, 50, 0, 0, 50);
+  bezierVertex(-50, 0, -20, -50, 0, -20);
+  endShape(CLOSE);
+  pop();
+
+  // Side hearts color cycling every second
+  if(millis() - lastColorChange > 1000){
+    colorIndex = (colorIndex + 1) % rainbowColors.length;
+    lastColorChange = millis();
+    for(let h of sideHearts){ h.color = color(rainbowColors[colorIndex]); }
+  }
+
+  for(let h of sideHearts){ h.update(); h.display(); }
+
+  // Top and bottom images
+  push(); translate(centerX-spacing,topY); rotate(frameCount*0.002);
+  scale(1+0.04*sin(frameCount*0.02)); imageMode(CENTER);
+  if(img1) image(img1,0,0,topSize,topSize); pop();
+
+  push(); translate(centerX+spacing,topY); rotate(-frameCount*0.002);
+  scale(1+0.04*sin(frameCount*0.025)); imageMode(CENTER);
+  if(img2) image(img2,0,0,topSize,topSize); pop();
+
+  // Happy Birthday text
+  textAlign(CENTER,CENTER); textSize(60); fill('#ff69b4'); textFont('Comic Sans MS');
+  text('Happy Birthday Mich!', centerX, textY);
+
+  push(); translate(centerX-spacing,bottomY); rotate(frameCount*0.003);
+  scale(1+0.04*sin(frameCount*0.03)); imageMode(CENTER);
+  if(img3) image(img3,0,0,bottomSize,bottomSize); pop();
+
+  push(); translate(centerX+spacing,bottomY); rotate(-frameCount*0.003);
+  scale(1+0.04*sin(frameCount*0.035)); imageMode(CENTER);
+  if(img4) image(img4,0,0,bottomSize,bottomSize); pop();
+}
+
+
+    // --- Second Canvas ---
+    function drawSecondCanvas(){
+      background('black'); if(secondCanvasAlpha<255) secondCanvasAlpha+=2;
+      for(let h of heartsArray){ h.update(); h.display(); }
+
+      const message = `Dear Michelle,
+
+It is with the utmost pleasure and joy that I wish you a happy 23rd birthday!
+
+Meeting you has been one of the greatest blessings, and experiencing the world with you by my side has been an absolute blast. I am oh so grateful to have you in my life not just as my girlfriend, but also as the utter delight that you are outside of our relationship. Thank you for simply being you (sweet, gracious, lit, vibrant, brilliant, handy, baller, hot, etc).
+
+I can’t wait for what’s in store for your twenty third year on Earth!
+
+Happiest of birthdays to you cutie!
+Jaida`;
+
+      const textBoxWidth = width*0.5, textX = (width-textBoxWidth)/2;
+      let y = height*0.1, lineHeight = 28;
+      textSize(24); textAlign(CENTER,TOP); fill('pink'); textFont('Comic Sans MS');
+      let lines = message.split('\n');
+      for(let line of lines){
+        let words = line.split(' '), currentLine='';
+        for(let word of words){
+          let testLine = currentLine+word+' ';
+          if(textWidth(testLine)>textBoxWidth && currentLine!==''){
+            text(currentLine,textX+textBoxWidth/2,y); currentLine=word+' '; y+=lineHeight;
+          } else currentLine = testLine;
+        }
+        text(currentLine,textX+textBoxWidth/2,y); y+=lineHeight*1.5;
+      }
+
+      // Mirrored central images below text
+      let pulseScale=1+0.04*sin(frameCount*0.05);
+      imageMode(CENTER); const imgWidth=160,imgHeight=160;
+      const horizontalPadding=(width-textBoxWidth)/2-imgWidth/2-20;
+      if(img){
+        let leftX=horizontalPadding,imgY=height*0.55; push(); translate(leftX,imgY); scale(pulseScale); image(img,0,0,imgWidth,imgHeight); pop();
+        let rightX=width-horizontalPadding; push(); translate(rightX,imgY); scale(-pulseScale,pulseScale); image(img,0,0,imgWidth,imgHeight); pop();
+      }
+    }
+
+    // --- Third Canvas ---
+    function drawThirdCanvas(){
+      background('#E0C6F0'); textFont('Comic Sans MS'); textAlign(CENTER,CENTER);
+      fill('#ff69b4'); textSize(50);
+      text(`  .✧･ﾟ: ✧･ﾟ: ✧･ﾟ: ✧･ﾟ: ✧･ﾟ✧.  
+ ♡\t\t✩ ✧ ✩\t\t♡
+ ♡      ･*･ ∧_∧ ⊹ ∧_∧･*･  ♡   
+ ♡  '.  (｡･ω･)(･ω･｡)  '   ♡
+ ♡        '･|  つ♡と  |･'     ♡   
+ ♡            ﾟ'･｡°｡･ﾟ'         ♡`, width/2, height/2-50);
+
+      if(thirdTextStartTime===0) thirdTextStartTime=millis();
+      if(millis()-thirdTextStartTime>1000 && thirdTextAlpha<255){ thirdTextAlpha+=5; if(thirdTextAlpha>255) thirdTextAlpha=255; }
+      fill(0,thirdTextAlpha); textSize(32);
+      text("I made a lil sing song for you <3", width/2, height/2+250);
+
+      if(millis()-thirdTextStartTime>3500 && secondLineAlpha<255){ secondLineAlpha+=5; if(secondLineAlpha>255) secondLineAlpha=255; }
+      fill(0,secondLineAlpha); textSize(28);
+      text("it's corny I hope you enjoyyy :P", width/2, height/2+300);
+    }
+
+    function drawFourthCanvas(){
+  background(0); 
+  noStroke(); 
+  fill(255);
+
+  // Twinkling stars
+  for(let s of stars){ 
+    ellipse(s.x,s.y,s.size); 
+    s.size += s.twinkleSpeed*s.twinkleDir; 
+    if(s.size > s.baseSize*1.5 || s.size < s.baseSize*0.5) s.twinkleDir*=-1; 
+  }
+
+  // Vinyl visualization in center
+  if(isPlayingFourth){
+    let spectrum = fft.analyze();
+    let energy = fft.getEnergy("bass");
+
+    push();
+    translate(width/2,height/2); // center
+    rotate(frameCount*2);
+    fill(50,50,200); 
+    ellipse(0,0,300,300);
+
+    push();
+    rotate(frameCount*4);
+    fill(255,255,255,60);
+    ellipse(-60,-60,120,30);
+    ellipse(60,60,100,20);
+    pop();
+
+    fill(0); ellipse(0,0,30,30);
+    pop();
+
+    // Spectrum outline
+    push();
+    translate(width/2,height/2);
+    noFill();
+    stroke(255,0,0);
+    strokeWeight(2);
+    beginShape();
+    for(let i=0;i<360;i+=10){
+      let amp = spectrum[i%256]/5;
+      let r = 150 + amp;
+      let x = r*cos(i);
+      let y = r*sin(i);
+      vertex(x,y);
+    }
+    endShape(CLOSE);
+    pop();
+  }
+
+  // Display title centered above vinyl after delay
+  if(lyricDelayUsed){
+    textSize(42); // slightly bigger title
+    fill(255);
+    textAlign(CENTER);
+    text("do you wanna...", width/2, height/2 - 250); // moved higher
+  }
+
+  // Display lyrics to the left of vinyl
+if(lyricEverShown){
+  let lyricFontSize = 32; // bigger text
+  textSize(lyricFontSize);
+  fill(255);
+  textAlign(LEFT);
+
+  let lyricsX = width/2 - 600; // moved further left from vinyl
+  for(let i=0;i<lyrics.length;i++){
+    let lineY = lyricY + i*(lyricFontSize + 4); 
+    if(lineY > -30 && lineY < height) text(lyrics[i], lyricsX, lineY);
+  }
+
+  if(isPlayingFourth && !lyricPaused && lyricDelayUsed){
+    lyricY -= 0.25; 
+    if(lyricY < -lyrics.length*(lyricFontSize+4)) lyricY = height;
+  }
+}
+
+
+
+
+  // Display masked heart image to the right of vinyl
+  if(maskedHeart){
+    push();
+    let floatY = height/2 + 10 * sin(frameCount * 0.05);
+    let floatX = width/2 + 500; // right of vinyl
+    translate(floatX, floatY);
+
+    let amp = fft.getEnergy("treble")/255; 
+    let pulseScaleX = 1.5 + 0.2 * amp;
+    let pulseScaleY = 1.3 + 0.15 * amp;
+
+    let tilt = 5 * sin(frameCount * 0.1);
+    rotate(tilt);
+
+    scale(pulseScaleX, pulseScaleY);
+    imageMode(CENTER);
+    image(maskedHeart, 0, 0, 450, 400);
+    pop();
+  }
+
+  // Start lyric delay if necessary
+  if(lyricStartTime!==null && millis()-lyricStartTime>lyricStartDelay){
+    lyricDelayUsed=true;
+    lyricStartTime=null;
+  }
+}
+
+
+
+    class Confetti{
+      constructor(){ this.x=random(width); this.y=random(-height,0); this.size=random(5,15); this.speed=random(1,3); this.color=color(random(255),random(255),random(255)); }
+      display(){ fill(this.color); noStroke(); rect(this.x,this.y,this.size,this.size); this.y+=this.speed; if(this.y>height){ this.y=random(-height,0); this.x=random(width); } }
+    }
+    class Heart{
+      constructor(){ this.x=random(width); this.y=random(height); this.size=random(10,30); this.color=color(random(255),random(255),random(255)); this.speed=random(0.5,1.5); }
+      update(){ this.y+=this.speed; if(this.y>height+this.size) { this.y=-this.size; this.x=random(width); } } // FALLING DOWN
+      display(){ push(); translate(this.x,this.y); scale(1,1); fill(this.color); noStroke();
+        beginShape(); vertex(0,-10); bezierVertex(10,-30,30,0,0,20); bezierVertex(-30,0,-10,-30,0,-10); endShape(CLOSE); pop(); }
+    }
+    class SideHeart{
+      constructor(x,y){ this.x=x; this.y=y; this.size=50; this.color=color(255,0,0); this.offset=random(TWO_PI); }
+      update(){ this.y+=0.5*sin(frameCount*0.05+this.offset); }
+      display(){ push(); translate(this.x,this.y); let pulse = 1+0.1*sin(frameCount*0.1); scale(pulse,pulse);
+        fill(this.color); noStroke();
+        beginShape(); vertex(0,-10); bezierVertex(10,-30,30,0,0,20); bezierVertex(-30,0,-10,-30,0,-10); endShape(CLOSE); pop(); }
+    }
+  </script>
+</body>
+</html>
